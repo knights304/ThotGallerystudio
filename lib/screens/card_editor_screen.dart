@@ -20,7 +20,6 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
   late final TextEditingController _description;
   late final TextEditingController _location;
   late final TextEditingController _tags;
-  late final TextEditingController _collections;
   late final TextEditingController _participants;
   late final TextEditingController _links;
   late final TextEditingController _notes;
@@ -53,8 +52,6 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     _description = TextEditingController(text: card?.description ?? '');
     _location = TextEditingController(text: card?.location ?? '');
     _tags = TextEditingController(text: card?.tags.join(', ') ?? '');
-    _collections =
-        TextEditingController(text: card?.collections.join(', ') ?? '');
     _participants =
         TextEditingController(text: card?.participants.join(', ') ?? '');
     _links = TextEditingController(text: card?.links.join('\n') ?? '');
@@ -107,7 +104,6 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
       _description,
       _location,
       _tags,
-      _collections,
       _participants,
       _links,
       _notes,
@@ -194,27 +190,20 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
       final firstPhoto = _media.where(
         (item) => item.type == GalleryMediaType.photo,
       );
-      _coverImagePath = firstPhoto.isEmpty ? null : firstPhoto.first.path;
+      _coverImagePath =
+          firstPhoto.isEmpty ? null : firstPhoto.first.path;
     }
     setState(() {});
   }
 
   void _save() {
-    FocusScope.of(context).unfocus();
-
-    final title = _title.text.trim().isEmpty
-        ? 'Untitled Gallery Card'
-        : _title.text.trim();
-    final points = int.tryParse(_thotPoints.text.trim()) ?? 100;
-    final safePoints = points.clamp(0, 9999).toInt();
-    final cardNumber = int.tryParse(_cardNumber.text.trim()) ?? 1;
-    final setTotal = int.tryParse(_setTotal.text.trim()) ?? 1;
+    if (!_formKey.currentState!.validate()) return;
     final existing = widget.existing;
 
-    try {
-      final card = GalleryCard(
+    Navigator.of(context).pop(
+      GalleryCard(
         id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
-        title: title,
+        title: _title.text.trim(),
         type: _type,
         status: _status,
         template: _template,
@@ -224,28 +213,29 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
         imageFit: _imageFit,
         imageAlignmentX: _imageAlignmentX,
         imageAlignmentY: _imageAlignmentY,
-        thotPoints: safePoints,
+        thotPoints: int.tryParse(_thotPoints.text.trim()) ?? 100,
         setName: _setName.text.trim(),
         rarityCategory: _rarityCategory.text.trim(),
         rarity: _rarity.text.trim(),
         fingerprint: existing?.fingerprint ?? '',
         views: existing?.views ?? 0,
         shareCount: existing?.shareCount ?? 0,
-        photoCount:
-            _media.where((item) => item.type == GalleryMediaType.photo).length,
-        videoCount:
-            _media.where((item) => item.type == GalleryMediaType.video).length,
+        photoCount: _media
+            .where((item) => item.type == GalleryMediaType.photo)
+            .length,
+        videoCount: _media
+            .where((item) => item.type == GalleryMediaType.video)
+            .length,
         locationCount: int.tryParse(_locationCount.text.trim()) ?? 0,
         peopleCount: int.tryParse(_peopleCount.text.trim()) ?? 0,
-        cardNumber: cardNumber < 1 ? 1 : cardNumber,
-        setTotal: setTotal < 1 ? 1 : setTotal,
+        cardNumber: int.tryParse(_cardNumber.text.trim()) ?? 1,
+        setTotal: int.tryParse(_setTotal.text.trim()) ?? 1,
         nfcEnabled: existing?.nfcEnabled ?? true,
         isRevealed: existing?.isRevealed ?? false,
         location: _location.text.trim(),
         date: existing?.date ?? DateTime.now(),
         rating: _rating,
         tags: _commaList(_tags.text),
-        collections: _commaList(_collections.text),
         participants: _commaList(_participants.text),
         links: _lineList(_links.text),
         notes: _notes.text.trim(),
@@ -253,17 +243,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
         createdAt: existing?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
         lastSharedAt: existing?.lastSharedAt,
-      );
-
-      card.ensureFingerprint();
-      Navigator.of(context).pop(card);
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Card could not be saved: $error'),
-        ),
-      );
-    }
+      ),
+    );
   }
 
   BoxFit get _previewFit => switch (_imageFit) {
@@ -274,18 +255,17 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasCover =
-        _coverImagePath != null && File(_coverImagePath!).existsSync();
+    final hasCover = _coverImagePath != null &&
+        File(_coverImagePath!).existsSync();
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.existing == null ? 'Create Card' : 'Edit Card'),
         actions: [
-          FilledButton.tonalIcon(
+          TextButton.icon(
             onPressed: _save,
             icon: const Icon(Icons.check),
             label: const Text('Save'),
           ),
-          const SizedBox(width: 8),
         ],
       ),
       body: Form(
@@ -411,32 +391,23 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                 initialValue: _imageFit,
                 decoration: const InputDecoration(
                   labelText: 'Photo fit',
-                  helperText:
-                      'Cover fills the frame. Contain shows the whole photo.',
+                  helperText: 'Cover fills the frame. Contain shows the whole photo.',
                 ),
-                items: GalleryImageFit.values
-                    .map((fit) => DropdownMenuItem(
-                          value: fit,
-                          child: Text(fit.name),
-                        ))
-                    .toList(),
+                items: GalleryImageFit.values.map((fit) => DropdownMenuItem(
+                  value: fit,
+                  child: Text(fit.name),
+                )).toList(),
                 onChanged: (value) => setState(() => _imageFit = value!),
               ),
               const SizedBox(height: 10),
               Text('Move left/right: ${_imageAlignmentX.toStringAsFixed(2)}'),
               Slider(
-                min: -1,
-                max: 1,
-                divisions: 40,
-                value: _imageAlignmentX,
+                min: -1, max: 1, divisions: 40, value: _imageAlignmentX,
                 onChanged: (value) => setState(() => _imageAlignmentX = value),
               ),
               Text('Move up/down: ${_imageAlignmentY.toStringAsFixed(2)}'),
               Slider(
-                min: -1,
-                max: 1,
-                divisions: 40,
-                value: _imageAlignmentY,
+                min: -1, max: 1, divisions: 40, value: _imageAlignmentY,
                 onChanged: (value) => setState(() => _imageAlignmentY = value),
               ),
             ],
@@ -444,6 +415,9 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
             TextFormField(
               controller: _title,
               decoration: const InputDecoration(labelText: 'Card title'),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Give the card a title.'
+                  : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -453,6 +427,13 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                 labelText: 'Thot Points 👅',
                 helperText: 'Displayed at the top-right of the card.',
               ),
+              validator: (value) {
+                final points = int.tryParse(value ?? '');
+                if (points == null || points < 0 || points > 9999) {
+                  return 'Use a number from 0 to 9999.';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -589,14 +570,6 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                 hintText: 'Food, Date Night, Adventure',
               ),
             ),
-            TextFormField(
-              controller: _collections,
-              decoration: const InputDecoration(
-                labelText: 'Collections',
-                hintText: 'VIP, Summer 2026',
-              ),
-            ),
-            const SizedBox(height: 12),
             const SizedBox(height: 12),
             TextFormField(
               controller: _participants,
