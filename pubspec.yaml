@@ -1,0 +1,37 @@
+name: thot_gallery_creator
+description: Thot Gallery Creator, an Android-first collectible media studio.
+publish_to: "none"
+version: 2.0.0-alpha.1+20
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.5.3
+  image_picker: ^1.2.2
+  url_launcher: ^6.3.2
+  share_plus: ^12.0.1
+  qr_flutter: ^4.1.0
+  crypto: ^3.0.6
+  video_player: ^2.10.0
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  desktop_drop: ^0.7.1
+  image: 4.8.0
+  archive: ^4.0.9
+  file_picker: 10.3.10
+  pdf: ^3.11.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  path_provider_platform_interface: ^2.1.2
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/thot_gallery_card_back.png
