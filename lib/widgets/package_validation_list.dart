@@ -45,7 +45,7 @@ class PackageValidationList extends StatelessWidget {
                 const SizedBox(width: 6),
                 _Count(Icons.warning_amber_rounded, report!.warningCount, Colors.amber),
                 const SizedBox(width: 6),
-                _Count(Icons.info_rounded, report!.infoCount, Colors.lightBlueAccent),
+                _Count(Icons.info_rounded, report!.informationCount, Colors.lightBlueAccent),
               ],
               if (onRefresh != null)
                 IconButton(

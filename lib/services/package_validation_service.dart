@@ -78,7 +78,9 @@ class PackageValidationReport {
     required this.photoCount,
     required this.videoCount,
     required this.createdAt,
-  });
+  }
+  
+  );
 
   final List<PackageValidationIssue> issues;
   final int estimatedSizeBytes;
