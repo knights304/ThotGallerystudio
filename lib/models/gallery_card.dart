@@ -57,6 +57,7 @@ class GalleryMediaItem {
     this.width = 0,
     this.height = 0,
     this.sizeBytes = 0,
+    this.durationMilliseconds = 0,
     this.importedAt,
     this.contentHash = '',
     this.collections = const [],
@@ -74,14 +75,41 @@ class GalleryMediaItem {
   int width;
   int height;
   int sizeBytes;
+  int durationMilliseconds;
   DateTime? importedAt;
   String contentHash;
   List<String> collections;
 
   String get filename => p.basename(path);
 
+  String get extension {
+    final value = p.extension(path).replaceFirst('.', '').toUpperCase();
+    return value.isEmpty ? 'Unknown' : value;
+  }
+
+  String get typeLabel =>
+      type == GalleryMediaType.photo ? 'Photo' : 'Video';
+
   String get dimensionsLabel =>
       width > 0 && height > 0 ? '$width×$height' : 'Unknown size';
+
+
+  String get durationLabel {
+    if (durationMilliseconds <= 0) {
+      return 'Unknown duration';
+    }
+
+    final duration = Duration(milliseconds: durationMilliseconds);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+
+    if (hours > 0) {
+      return '$hours:$minutes:$seconds';
+    }
+
+    return '${duration.inMinutes}:$seconds';
+  }
 
   String get sizeLabel {
     if (sizeBytes <= 0) {
@@ -112,6 +140,7 @@ class GalleryMediaItem {
         'width': width,
         'height': height,
         'sizeBytes': sizeBytes,
+        'durationMilliseconds': durationMilliseconds,
         'importedAt': importedAt?.toIso8601String(),
         'contentHash': contentHash,
         'collections': collections,
@@ -135,6 +164,8 @@ class GalleryMediaItem {
       width: (json['width'] as num?)?.toInt() ?? 0,
       height: (json['height'] as num?)?.toInt() ?? 0,
       sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
+      durationMilliseconds:
+          (json['durationMilliseconds'] as num?)?.toInt() ?? 0,
       importedAt: DateTime.tryParse(json['importedAt'] as String? ?? ''),
       contentHash: json['contentHash'] as String? ?? '',
       collections: List<String>.from(json['collections'] as List? ?? const []),

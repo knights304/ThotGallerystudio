@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/gallery_card.dart';
+import 'media_controller.dart';
 import 'media_delete_dialog.dart';
 import 'media_grid_tile.dart';
 
@@ -29,73 +30,28 @@ class MediaManager extends StatefulWidget {
 }
 
 class _MediaManagerState extends State<MediaManager> {
-  late List<GalleryMediaItem> _media;
-
-  String? _selectedMediaId;
+  late final MediaController _controller;
 
   @override
   void initState() {
     super.initState();
-    _media = List<GalleryMediaItem>.from(widget.media);
+    _controller = MediaController(media: widget.media);
   }
 
   @override
   void didUpdateWidget(covariant MediaManager oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    if (!_sameMediaList(oldWidget.media, widget.media)) {
-      _media = List<GalleryMediaItem>.from(widget.media);
-
-      final selectedStillExists = _media.any(
-        (item) => item.id == _selectedMediaId,
-      );
-
-      if (!selectedStillExists) {
-        _selectedMediaId = null;
-      }
-    }
+    _controller.replaceMedia(widget.media);
   }
 
-  bool _sameMediaList(
-    List<GalleryMediaItem> first,
-    List<GalleryMediaItem> second,
-  ) {
-    if (identical(first, second)) {
-      return true;
-    }
-
-    if (first.length != second.length) {
-      return false;
-    }
-
-    for (var index = 0; index < first.length; index++) {
-      final firstItem = first[index];
-      final secondItem = second[index];
-
-      if (firstItem.id != secondItem.id ||
-          firstItem.path != secondItem.path ||
-          firstItem.type != secondItem.type) {
-        return false;
-      }
-    }
-
-    return true;
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   void _notifyMediaChanged() {
-    widget.onMediaChanged(
-      List<GalleryMediaItem>.unmodifiable(_media),
-    );
-  }
-
-  void _selectMedia(GalleryMediaItem item) {
-    setState(() {
-      if (_selectedMediaId == item.id) {
-        _selectedMediaId = null;
-      } else {
-        _selectedMediaId = item.id;
-      }
-    });
+    widget.onMediaChanged(_controller.media);
   }
 
   void _setCover(GalleryMediaItem item) {
@@ -103,11 +59,8 @@ class _MediaManagerState extends State<MediaManager> {
       return;
     }
 
+    _controller.select(item);
     widget.onCoverChanged(item.path);
-
-    setState(() {
-      _selectedMediaId = item.id;
-    });
   }
 
   Future<void> _requestDelete(
@@ -130,26 +83,16 @@ class _MediaManagerState extends State<MediaManager> {
     GalleryMediaItem item,
     int index,
   ) {
-    if (index < 0 || index >= _media.length) {
+    final previousCoverPath = widget.coverImagePath;
+    final removedWasCover = previousCoverPath == item.path;
+    final removed = _controller.removeAt(index);
+
+    if (removed == null) {
       return;
     }
 
-    final previousCoverPath = widget.coverImagePath;
-    final removedWasCover = previousCoverPath == item.path;
-
-    setState(() {
-      _media.removeAt(index);
-
-      if (_selectedMediaId == item.id) {
-        _selectedMediaId = null;
-      }
-    });
-
-    String? replacementCoverPath = previousCoverPath;
-
     if (removedWasCover) {
-      replacementCoverPath = _findFirstPhotoPath();
-      widget.onCoverChanged(replacementCoverPath);
+      widget.onCoverChanged(_controller.firstPhotoPath());
     }
 
     _notifyMediaChanged();
@@ -168,48 +111,38 @@ class _MediaManagerState extends State<MediaManager> {
           action: SnackBarAction(
             label: 'Undo',
             onPressed: () {
-              _restoreDeletedMedia(
+              final restored = _controller.restore(
                 item: item,
                 originalIndex: index,
-                previousCoverPath: previousCoverPath,
               );
+
+              if (!restored) {
+                return;
+              }
+
+              _notifyMediaChanged();
+
+              if (previousCoverPath != widget.coverImagePath) {
+                widget.onCoverChanged(previousCoverPath);
+              }
             },
           ),
         ),
       );
   }
 
-  void _restoreDeletedMedia({
-    required GalleryMediaItem item,
-    required int originalIndex,
-    required String? previousCoverPath,
+  void _reorderMedia({
+    required String draggedMediaId,
+    required String targetMediaId,
   }) {
-    if (_media.any((existingItem) => existingItem.id == item.id)) {
-      return;
+    final changed = _controller.reorderById(
+      draggedMediaId: draggedMediaId,
+      targetMediaId: targetMediaId,
+    );
+
+    if (changed) {
+      _notifyMediaChanged();
     }
-
-    final safeIndex = originalIndex.clamp(0, _media.length);
-
-    setState(() {
-      _media.insert(safeIndex, item);
-      _selectedMediaId = item.id;
-    });
-
-    _notifyMediaChanged();
-
-    if (previousCoverPath != widget.coverImagePath) {
-      widget.onCoverChanged(previousCoverPath);
-    }
-  }
-
-  String? _findFirstPhotoPath() {
-    for (final item in _media) {
-      if (item.type == GalleryMediaType.photo) {
-        return item.path;
-      }
-    }
-
-    return null;
   }
 
   int _calculateColumnCount(double width) {
@@ -240,97 +173,180 @@ class _MediaManagerState extends State<MediaManager> {
     return 1;
   }
 
+  Widget _buildDragFeedback(
+    BuildContext context,
+    GalleryMediaItem item,
+  ) {
+    final width = MediaQuery.sizeOf(context).width;
+    final feedbackWidth = width < 600 ? 150.0 : 180.0;
+
+    return Material(
+      color: Colors.transparent,
+      elevation: 10,
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        width: feedbackWidth,
+        child: Opacity(
+          opacity: 0.92,
+          child: MediaGridTile(
+            mediaItem: item,
+            isCover: widget.coverImagePath == item.path,
+            selected: true,
+            onTap: () {},
+            onSetCover: () {},
+            onDelete: () {},
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDraggableTile({
+    required BuildContext context,
+    required GalleryMediaItem item,
+    required int index,
+  }) {
+    final tile = MediaGridTile(
+      key: ValueKey(item.id),
+      mediaItem: item,
+      isCover: widget.coverImagePath == item.path,
+      selected: _controller.isSelected(item),
+      onTap: () => _controller.toggleSelection(item),
+      onSetCover: () => _setCover(item),
+      onDelete: () => _requestDelete(item, index),
+    );
+
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (details) {
+        return details.data != item.id;
+      },
+      onAcceptWithDetails: (details) {
+        _reorderMedia(
+          draggedMediaId: details.data,
+          targetMediaId: item.id,
+        );
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isTargeted = candidateData.isNotEmpty;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              width: isTargeted ? 3 : 0,
+              color: isTargeted
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.transparent,
+            ),
+          ),
+          child: LongPressDraggable<String>(
+            data: item.id,
+            delay: const Duration(milliseconds: 250),
+            dragAnchorStrategy: pointerDragAnchorStrategy,
+            onDragStarted: () => _controller.beginDrag(item.id),
+            onDragEnd: (_) => _controller.endDrag(),
+            onDraggableCanceled: (_, __) => _controller.endDrag(),
+            feedback: _buildDragFeedback(context, item),
+            childWhenDragging: Opacity(
+              opacity: 0.28,
+              child: tile,
+            ),
+            child: tile,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final photoCount = _media
-        .where((item) => item.type == GalleryMediaType.photo)
-        .length;
-    final videoCount = _media
-        .where((item) => item.type == GalleryMediaType.video)
-        .length;
 
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _MediaManagerHeader(
-              totalCount: _media.length,
-              photoCount: photoCount,
-              videoCount: videoCount,
-              onAddPhotos: widget.onAddPhotos,
-              onAddVideo: widget.onAddVideo,
-            ),
-            const SizedBox(height: 16),
-            if (_media.isEmpty)
-              _MediaEmptyState(
-                onAddPhotos: widget.onAddPhotos,
-                onAddVideo: widget.onAddVideo,
-              )
-            else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final columnCount = _calculateColumnCount(
-                    constraints.maxWidth,
-                  );
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final media = _controller.media;
 
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _media.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columnCount,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: _calculateAspectRatio(
+        return Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _MediaManagerHeader(
+                  totalCount: _controller.totalCount,
+                  photoCount: _controller.photoCount,
+                  videoCount: _controller.videoCount,
+                  onAddPhotos: widget.onAddPhotos,
+                  onAddVideo: widget.onAddVideo,
+                ),
+                const SizedBox(height: 16),
+                if (_controller.isEmpty)
+                  _MediaEmptyState(
+                    onAddPhotos: widget.onAddPhotos,
+                    onAddVideo: widget.onAddVideo,
+                  )
+                else
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columnCount = _calculateColumnCount(
                         constraints.maxWidth,
-                      ),
-                    ),
-                    itemBuilder: (context, index) {
-                      final item = _media[index];
+                      );
 
-                      return MediaGridTile(
-                        key: ValueKey(item.id),
-                        mediaItem: item,
-                        isCover: widget.coverImagePath == item.path,
-                        selected: _selectedMediaId == item.id,
-                        onTap: () => _selectMedia(item),
-                        onSetCover: () => _setCover(item),
-                        onDelete: () => _requestDelete(item, index),
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: media.length,
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columnCount,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: _calculateAspectRatio(
+                            constraints.maxWidth,
+                          ),
+                        ),
+                        itemBuilder: (context, index) {
+                          return _buildDraggableTile(
+                            context: context,
+                            item: media[index],
+                            index: index,
+                          );
+                        },
                       );
                     },
-                  );
-                },
-              ),
-            if (_media.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Icon(
-                    Icons.touch_app_outlined,
-                    size: 17,
-                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      'Select an item to highlight it. Use the menu on a photo '
-                      'to make it the card cover or remove it.',
-                      style: theme.textTheme.bodySmall?.copyWith(
+                if (_controller.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.drag_indicator,
+                        size: 18,
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
-                    ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          'Press and hold a media tile, then drag it onto '
+                          'another tile to change the display order.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
-          ],
-        ),
-      ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -437,9 +453,7 @@ class _MediaEmptyState extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Container(
-      constraints: const BoxConstraints(
-        minHeight: 230,
-      ),
+      constraints: const BoxConstraints(minHeight: 230),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(

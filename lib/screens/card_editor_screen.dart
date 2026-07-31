@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/gallery_card.dart';
+import '../services/dashboard_service.dart';
+import '../services/media_metadata_service.dart';
+import '../widgets/creator_dashboard/creator_dashboard.dart';
+import '../widgets/media/media_manager.dart';
 
 class CardEditorScreen extends StatefulWidget {
   const CardEditorScreen({super.key, this.existing});
@@ -43,6 +47,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
   late double _rating;
   String? _coverImagePath;
   late List<GalleryMediaItem> _media;
+  bool _isImportingMedia = false;
 
   @override
   void initState() {
@@ -95,10 +100,12 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     _rating = card?.rating ?? 0;
     _coverImagePath = card?.coverImagePath;
     _media = List<GalleryMediaItem>.from(card?.media ?? const []);
+    _title.addListener(_refreshDashboard);
   }
 
   @override
   void dispose() {
+    _title.removeListener(_refreshDashboard);
     for (final controller in [
       _title,
       _description,
@@ -135,6 +142,12 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
       .where((item) => item.isNotEmpty)
       .toList();
 
+  void _refreshDashboard() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   Future<void> _pickCover() async {
     final image = await ImagePicker().pickImage(
       source: ImageSource.gallery,
@@ -150,50 +163,81 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
   }
 
   Future<void> _addPhotos() async {
-    final images = await ImagePicker().pickMultiImage(imageQuality: 92);
-    if (images.isEmpty) return;
+    if (_isImportingMedia) return;
 
-    setState(() {
+    final images = await ImagePicker().pickMultiImage(imageQuality: 92);
+    if (images.isEmpty || !mounted) return;
+
+    setState(() => _isImportingMedia = true);
+
+    try {
+      final importedItems = <GalleryMediaItem>[];
+
       for (final image in images) {
-        _media.add(
-          GalleryMediaItem(
-            id: DateTime.now().microsecondsSinceEpoch.toString(),
-            path: image.path,
-            type: GalleryMediaType.photo,
-          ),
+        importedItems.add(
+          await MediaMetadataService.createPhoto(image.path),
         );
       }
-      _coverImagePath ??= images.first.path;
-    });
+
+      if (!mounted) return;
+
+      setState(() {
+        _media.addAll(importedItems);
+        _coverImagePath ??= images.first.path;
+      });
+
+      _showImportMessage(
+        importedItems.length == 1
+            ? 'Photo imported with metadata.'
+            : '${importedItems.length} photos imported with metadata.',
+      );
+    } catch (error) {
+      if (mounted) {
+        _showImportMessage('Could not import the selected photos: $error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isImportingMedia = false);
+      }
+    }
   }
 
   Future<void> _addVideo() async {
+    if (_isImportingMedia) return;
+
     final video = await ImagePicker().pickVideo(
       source: ImageSource.gallery,
     );
-    if (video == null) return;
+    if (video == null || !mounted) return;
 
-    setState(() {
-      _media.add(
-        GalleryMediaItem(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          path: video.path,
-          type: GalleryMediaType.video,
-        ),
-      );
-    });
+    setState(() => _isImportingMedia = true);
+
+    try {
+      final importedVideo = await MediaMetadataService.createVideo(video.path);
+      if (!mounted) return;
+
+      setState(() {
+        _media.add(importedVideo);
+      });
+
+      _showImportMessage('Video imported with metadata.');
+    } catch (error) {
+      if (mounted) {
+        _showImportMessage('Could not import the selected video: $error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isImportingMedia = false);
+      }
+    }
   }
 
-  void _removeMedia(int index) {
-    final removed = _media.removeAt(index);
-    if (_coverImagePath == removed.path) {
-      final firstPhoto = _media.where(
-        (item) => item.type == GalleryMediaType.photo,
+  void _showImportMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message)),
       );
-      _coverImagePath =
-          firstPhoto.isEmpty ? null : firstPhoto.first.path;
-    }
-    setState(() {});
   }
 
   void _save() {
@@ -261,8 +305,18 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
       appBar: AppBar(
         title: Text(widget.existing == null ? 'Create Card' : 'Edit Card'),
         actions: [
+          if (_isImportingMedia)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                child: SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
           TextButton.icon(
-            onPressed: _save,
+            onPressed: _isImportingMedia ? null : _save,
             icon: const Icon(Icons.check),
             label: const Text('Save'),
           ),
@@ -273,6 +327,14 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            CreatorDashboard(
+              data: DashboardService.calculate(
+                title: _title.text,
+                coverImagePath: _coverImagePath,
+                media: _media,
+              ),
+            ),
+            const SizedBox(height: 18),
             FilledButton.tonalIcon(
               onPressed: _pickCover,
               icon: const Icon(Icons.add_photo_alternate_outlined),
@@ -283,96 +345,25 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _addPhotos,
-                    icon: const Icon(Icons.photo_library_outlined),
-                    label: const Text('Add Photos'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _addVideo,
-                    icon: const Icon(Icons.video_library_outlined),
-                    label: const Text('Add Video'),
-                  ),
-                ),
-              ],
+            MediaManager(
+              media: _media,
+              coverImagePath: _coverImagePath,
+              onMediaChanged: (updatedMedia) {
+                setState(() {
+                  _media = List<GalleryMediaItem>.from(updatedMedia);
+                });
+              },
+              onCoverChanged: (path) {
+                setState(() {
+                  _coverImagePath = path;
+                  _imageAlignmentX = 0;
+                  _imageAlignmentY = 0;
+                });
+              },
+              onAddPhotos: _isImportingMedia ? () {} : _addPhotos,
+              onAddVideo: _isImportingMedia ? () {} : _addVideo,
             ),
-            if (_media.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Living Media (${_media.length})',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 92,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _media.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final item = _media[index];
-                    return Stack(
-                      children: [
-                        Container(
-                          width: 105,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.black,
-                            border: Border.all(
-                              color: const Color(0x557D6C8E),
-                            ),
-                          ),
-                          child: item.type == GalleryMediaType.photo
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(11),
-                                  child: Image.file(
-                                    File(item.path),
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                              : const Center(
-                                  child: Icon(
-                                    Icons.play_circle_outline,
-                                    size: 38,
-                                  ),
-                                ),
-                        ),
-                        Positioned(
-                          top: 3,
-                          right: 3,
-                          child: IconButton.filled(
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => _removeMedia(index),
-                            icon: const Icon(Icons.close, size: 16),
-                          ),
-                        ),
-                        if (item.type == GalleryMediaType.photo)
-                          Positioned(
-                            left: 4,
-                            bottom: 4,
-                            child: TextButton(
-                              onPressed: () => setState(
-                                () => _coverImagePath = item.path,
-                              ),
-                              child: Text(
-                                _coverImagePath == item.path
-                                    ? 'Cover'
-                                    : 'Set cover',
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
+            const SizedBox(height: 16),
             if (hasCover) ...[
               const SizedBox(height: 14),
               AspectRatio(
