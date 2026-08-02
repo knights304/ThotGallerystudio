@@ -47,7 +47,7 @@ class ContentPanel extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               buildDefaultDragHandles: false,
               itemCount: cards.length,
-              onReorder: (oldIndex, newIndex) {
+              onReorderItem: (oldIndex, newIndex) {
                 if (isBusy) return;
                 onReorder?.call(oldIndex, newIndex);
               },
@@ -126,9 +126,7 @@ class _CardTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return CheckboxListTile(
       value: selected,
-      onChanged: enabled
-          ? (value) => onChanged(value ?? false)
-          : null,
+      onChanged: enabled ? (value) => onChanged(value ?? false) : null,
       title: Text(
         card.title,
         style: const TextStyle(

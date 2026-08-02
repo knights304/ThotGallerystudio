@@ -483,7 +483,7 @@ class _PieceWizardScreenState extends State<PieceWizardScreen> {
               scrollDirection: Axis.horizontal,
               buildDefaultDragHandles: false,
               itemCount: _media.length,
-              onReorder: _reorderMedia,
+              onReorderItem: _reorderMedia,
               itemBuilder: (context, index) {
                 final item = _media[index];
                 final isCover = item.path == _coverPath;

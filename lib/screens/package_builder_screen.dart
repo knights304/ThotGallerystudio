@@ -11,6 +11,7 @@ import '../services/package_builder_service.dart';
 import '../services/package_validation_service.dart';
 import '../theme/gallery_theme.dart';
 import '../widgets/gradient_shell.dart';
+import '../widgets/metadata_panel.dart';
 
 class PackageBuilderScreen extends StatefulWidget {
   const PackageBuilderScreen({
@@ -327,6 +328,10 @@ class _PackageBuilderScreenState extends State<PackageBuilderScreen> {
             children: [
               _buildHeader(validation),
               const SizedBox(height: 16),
+              MetadataPanel(
+                card: _card,
+              ),
+              const SizedBox(height: 16),
               if (_errorMessage != null) ...[
                 _ErrorBanner(message: _errorMessage!),
                 const SizedBox(height: 16),
@@ -400,9 +405,7 @@ class _PackageBuilderScreenState extends State<PackageBuilderScreen> {
               borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(
-              ready
-                  ? Icons.inventory_2_rounded
-                  : Icons.inventory_2_outlined,
+              ready ? Icons.inventory_2_rounded : Icons.inventory_2_outlined,
               color: Colors.white,
               size: 31,
             ),
@@ -453,8 +456,9 @@ class _PackageBuilderScreenState extends State<PackageBuilderScreen> {
 
   Widget _buildPackageSummary(PackageValidationReport? validation) {
     final coverPath = _card.coverImagePath;
-    final coverExists =
-        coverPath != null && coverPath.isNotEmpty && File(coverPath).existsSync();
+    final coverExists = coverPath != null &&
+        coverPath.isNotEmpty &&
+        File(coverPath).existsSync();
 
     return _SectionCard(
       title: 'Package Summary',
@@ -490,9 +494,8 @@ class _PackageBuilderScreenState extends State<PackageBuilderScreen> {
                   children: [
                     _SummaryRow(
                       label: 'Card',
-                      value: _card.title.trim().isEmpty
-                          ? 'Untitled'
-                          : _card.title,
+                      value:
+                          _card.title.trim().isEmpty ? 'Untitled' : _card.title,
                     ),
                     _SummaryRow(
                       label: 'Set',
@@ -824,13 +827,11 @@ class _PackageBuilderScreenState extends State<PackageBuilderScreen> {
     );
   }
 
-  int get _photoCount => _card.media
-      .where((item) => item.type == GalleryMediaType.photo)
-      .length;
+  int get _photoCount =>
+      _card.media.where((item) => item.type == GalleryMediaType.photo).length;
 
-  int get _videoCount => _card.media
-      .where((item) => item.type == GalleryMediaType.video)
-      .length;
+  int get _videoCount =>
+      _card.media.where((item) => item.type == GalleryMediaType.video).length;
 
   String get _expectedFilename {
     final cleanTitle = _card.title

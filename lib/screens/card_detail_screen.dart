@@ -8,6 +8,7 @@ import '../theme/gallery_theme.dart';
 import '../widgets/flippable_gallery_card.dart';
 import '../widgets/living_media_gallery.dart';
 import 'card_editor_screen.dart';
+import 'package_builder_screen.dart';
 
 class CardDetailScreen extends StatefulWidget {
   const CardDetailScreen({
@@ -97,6 +98,14 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     });
   }
 
+  Future<void> _openPackageBuilder() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PackageBuilderScreen(card: card),
+      ),
+    );
+  }
+
   Future<void> _deleteCard() async {
     final navigator = Navigator.of(context);
 
@@ -122,6 +131,10 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
           ),
           PopupMenuButton<String>(
             onSelected: (value) async {
+              if (value == 'build-package') {
+                await _openPackageBuilder();
+              }
+
               if (value == 'edit') {
                 await _edit();
               }
@@ -135,6 +148,16 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
               }
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'build-package',
+                child: Row(
+                  children: [
+                    Icon(Icons.inventory_2_outlined),
+                    SizedBox(width: 10),
+                    Text('Build Package'),
+                  ],
+                ),
+              ),
               PopupMenuItem(value: 'edit', child: Text('Edit')),
               PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
               PopupMenuItem(value: 'delete', child: Text('Delete')),

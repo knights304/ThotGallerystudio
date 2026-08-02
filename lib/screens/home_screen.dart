@@ -13,6 +13,7 @@ import '../services/creator_profile_store.dart';
 import '../features/theme_builder/theme_builder_screen.dart';
 import 'card_detail_screen.dart';
 import 'piece_wizard_screen.dart';
+import 'package_import_screen.dart';
 import 'signature_profile_screen.dart';
 
 enum _VaultSort { recentlyEdited, title, rarity, favoritesFirst }
@@ -119,6 +120,30 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.of(context).push<GalleryCard>(
       MaterialPageRoute(
         builder: (_) => PieceWizardScreen(store: widget.store),
+      ),
+    );
+  }
+
+  Future<void> _importPackage() async {
+    final imported = await Navigator.of(context).push<GalleryCard>(
+      MaterialPageRoute(
+        builder: (_) => PackageImportScreen(store: widget.store),
+      ),
+    );
+
+    if (!mounted || imported == null) {
+      return;
+    }
+
+    setState(() {
+      _filter = 'All';
+      _query = '';
+      _sort = _VaultSort.recentlyEdited;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Imported “${imported.title}” into your vault.'),
       ),
     );
   }
@@ -310,6 +335,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
+            IconButton.filledTonal(
+              tooltip: 'Import TG package',
+              onPressed: _importPackage,
+              icon: const Icon(Icons.move_to_inbox_rounded),
+            ),
+            const SizedBox(width: 8),
             _CountBadge(
               icon: Icons.style_rounded,
               value: widget.store.cards.length,
@@ -625,7 +656,8 @@ class _CountBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: GalleryColors.panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: GalleryColors.purpleBright.withValues(alpha: 0.35)),
+        border: Border.all(
+            color: GalleryColors.purpleBright.withValues(alpha: 0.35)),
       ),
       child: Row(
         children: [
