@@ -198,8 +198,13 @@ class PackageBuilderService {
 
       final encoder = ZipFileEncoder();
       encoder.create(outPath);
-      encoder.addDirectory(tempDir);
-      encoder.close();
+
+      await encoder.addDirectory(
+        tempDir,
+        includeDirName: false,
+      );
+
+      await encoder.close();
 
       update(
         PackageBuildStage.hashing,
@@ -250,6 +255,9 @@ class PackageBuilderService {
     required List<String> mediaRelativePaths,
   }) {
     final json = Map<String, dynamic>.from(card.toJson());
+
+    // Local import provenance belongs to this device, not the portable card.
+    json.remove('importedContentHash');
 
     json['coverImagePath'] =
         coverRelativePath.isEmpty ? null : coverRelativePath;

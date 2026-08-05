@@ -87,12 +87,10 @@ class GalleryMediaItem {
     return value.isEmpty ? 'Unknown' : value;
   }
 
-  String get typeLabel =>
-      type == GalleryMediaType.photo ? 'Photo' : 'Video';
+  String get typeLabel => type == GalleryMediaType.photo ? 'Photo' : 'Video';
 
   String get dimensionsLabel =>
       width > 0 && height > 0 ? '$width×$height' : 'Unknown size';
-
 
   String get durationLabel {
     if (durationMilliseconds <= 0) {
@@ -193,6 +191,12 @@ class GalleryCard {
     this.cardNumber = 1,
     this.setTotal = 1,
     this.fingerprint = '',
+    this.importedContentHash = '',
+    this.importedAt,
+    this.sourcePackageName = '',
+    this.importedPackageVersion = 0,
+    this.importedCreatorVersion = '',
+    this.importWasReplacement = false,
     this.views = 0,
     this.shareCount = 0,
     this.photoCount = 0,
@@ -233,6 +237,27 @@ class GalleryCard {
   int cardNumber;
   int setTotal;
   String fingerprint;
+
+  /// SHA-256 of the verified portable card.json from the last imported
+  /// package. Empty for cards created locally in Creator.
+  String importedContentHash;
+
+  /// When this card was most recently imported from a verified .tgpack.
+  DateTime? importedAt;
+
+  /// Original .tgpack filename used for the most recent import.
+  String sourcePackageName;
+
+  /// TG package format version used for the most recent import.
+  int importedPackageVersion;
+
+  /// Creator application version recorded by the imported package manifest.
+  String importedCreatorVersion;
+
+  /// True when the most recent import intentionally replaced an existing card
+  /// with the same card ID.
+  bool importWasReplacement;
+
   int views;
   int shareCount;
   int photoCount;
@@ -253,6 +278,11 @@ class GalleryCard {
   DateTime? createdAt;
   DateTime? updatedAt;
   DateTime? lastSharedAt;
+
+  bool get hasImportProvenance =>
+      importedAt != null ||
+      importedContentHash.isNotEmpty ||
+      sourcePackageName.isNotEmpty;
 
   GalleryCard copy() => GalleryCard.fromJson(toJson());
 
@@ -312,6 +342,12 @@ class GalleryCard {
         'cardNumber': cardNumber,
         'setTotal': setTotal,
         'fingerprint': fingerprint,
+        'importedContentHash': importedContentHash,
+        'importedAt': importedAt?.toIso8601String(),
+        'sourcePackageName': sourcePackageName,
+        'importedPackageVersion': importedPackageVersion,
+        'importedCreatorVersion': importedCreatorVersion,
+        'importWasReplacement': importWasReplacement,
         'views': views,
         'shareCount': shareCount,
         'photoCount': photoCount,
@@ -370,6 +406,13 @@ class GalleryCard {
       cardNumber: (json['cardNumber'] as num?)?.toInt() ?? 1,
       setTotal: (json['setTotal'] as num?)?.toInt() ?? 1,
       fingerprint: json['fingerprint'] as String? ?? '',
+      importedContentHash: json['importedContentHash'] as String? ?? '',
+      importedAt: DateTime.tryParse(json['importedAt'] as String? ?? ''),
+      sourcePackageName: json['sourcePackageName'] as String? ?? '',
+      importedPackageVersion:
+          (json['importedPackageVersion'] as num?)?.toInt() ?? 0,
+      importedCreatorVersion: json['importedCreatorVersion'] as String? ?? '',
+      importWasReplacement: json['importWasReplacement'] as bool? ?? false,
       views: (json['views'] as num?)?.toInt() ?? 0,
       shareCount: (json['shareCount'] as num?)?.toInt() ?? 0,
       photoCount: (json['photoCount'] as num?)?.toInt() ?? 0,

@@ -10,6 +10,13 @@ import '../services/package_import_service.dart';
 import '../theme/gallery_theme.dart';
 import '../widgets/gradient_shell.dart';
 
+enum _DuplicateKind {
+  none,
+  exact,
+  fingerprint,
+  idConflict,
+}
+
 class PackageImportScreen extends StatefulWidget {
   const PackageImportScreen({super.key, required this.store});
 
@@ -107,44 +114,137 @@ class _PackageImportScreenState extends State<PackageImportScreen> {
   GalleryCard? get _duplicateById {
     final card = _inspection?.card;
     if (card == null) return null;
+
     for (final existing in widget.store.cards) {
-      if (existing.id == card.id) return existing;
+      if (existing.id == card.id) {
+        return existing;
+      }
     }
+
     return null;
   }
 
   GalleryCard? get _duplicateByFingerprint {
     final card = _inspection?.card;
-    if (card == null || card.fingerprint.trim().isEmpty) return null;
+    if (card == null || card.fingerprint.trim().isEmpty) {
+      return null;
+    }
+
     for (final existing in widget.store.cards) {
       if (existing.fingerprint.isNotEmpty &&
           existing.fingerprint == card.fingerprint) {
         return existing;
       }
     }
+
     return null;
   }
 
-  String? get _duplicateMessage {
+  String get _incomingContentHash {
+    final manifest = _inspection?.manifest;
+
+    if (manifest == null) {
+      return '';
+    }
+
+    return manifest.fileHashes[manifest.cardFile] ?? '';
+  }
+
+  _DuplicateKind get _duplicateKind {
     final card = _inspection?.card;
-    if (card == null) return null;
+
+    if (card == null) {
+      return _DuplicateKind.none;
+    }
 
     final idMatch = _duplicateById;
     final fingerprintMatch = _duplicateByFingerprint;
 
-    if (idMatch != null && idMatch.fingerprint == card.fingerprint) {
-      return 'This exact card is already in your vault.';
-    }
-    if (fingerprintMatch != null) {
-      return 'A card with this fingerprint is already in your vault as "${fingerprintMatch.title}".';
-    }
     if (idMatch != null) {
-      return 'Card ID ${card.id} is already used by "${idMatch.title}". Import is blocked to avoid overwriting it.';
+      final incomingHash = _incomingContentHash.trim();
+      final storedHash = idMatch.importedContentHash.trim();
+
+      if (incomingHash.isNotEmpty &&
+          storedHash.isNotEmpty &&
+          incomingHash == storedHash) {
+        return _DuplicateKind.exact;
+      }
+
+      return _DuplicateKind.idConflict;
     }
-    return null;
+
+    if (fingerprintMatch != null && fingerprintMatch.id != card.id) {
+      return _DuplicateKind.fingerprint;
+    }
+
+    return _DuplicateKind.none;
   }
 
-  Future<void> _importPackage() async {
+  String? get _duplicateMessage {
+    final card = _inspection?.card;
+    if (card == null) {
+      return null;
+    }
+
+    final idMatch = _duplicateById;
+    final fingerprintMatch = _duplicateByFingerprint;
+
+    return switch (_duplicateKind) {
+      _DuplicateKind.none => null,
+      _DuplicateKind.exact => 'This exact card is already in your vault.',
+      _DuplicateKind.fingerprint =>
+        'This collectible is already in your vault as '
+            '"${fingerprintMatch?.title ?? card.title}".',
+      _DuplicateKind.idConflict => 'Card ID ${card.id} is already used by '
+          '"${idMatch?.title ?? 'another card'}". '
+          'You can replace the existing card with this verified package.',
+    };
+  }
+
+  Future<bool> _confirmReplacement() async {
+    final incoming = _inspection?.card;
+    final existing = _duplicateById;
+
+    if (incoming == null || existing == null) {
+      return false;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          icon: const Icon(
+            Icons.sync_problem_rounded,
+            color: Colors.amber,
+            size: 38,
+          ),
+          title: const Text('Replace Existing Card?'),
+          content: Text(
+            'Card ID ${incoming.id} already belongs to '
+            '"${existing.title}".\n\n'
+            'Replace it with the verified package "${incoming.title}"?\n\n'
+            'The existing card data and its active media references will be '
+            'replaced.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.sync_rounded),
+              label: const Text('Replace Existing'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return confirmed == true;
+  }
+
+  Future<void> _importPackage({bool replaceExisting = false}) async {
     final inspection = _inspection;
     final card = inspection?.card;
 
@@ -152,10 +252,22 @@ class _PackageImportScreenState extends State<PackageImportScreen> {
       return;
     }
 
-    final duplicateMessage = _duplicateMessage;
-    if (duplicateMessage != null) {
-      _showMessage(duplicateMessage);
+    final duplicateKind = _duplicateKind;
+
+    if (duplicateKind == _DuplicateKind.exact ||
+        duplicateKind == _DuplicateKind.fingerprint) {
+      final message = _duplicateMessage;
+      if (message != null) {
+        _showMessage(message);
+      }
       return;
+    }
+
+    if (duplicateKind == _DuplicateKind.idConflict && !replaceExisting) {
+      final confirmed = await _confirmReplacement();
+      if (!confirmed || !mounted) {
+        return;
+      }
     }
 
     setState(() {
@@ -164,11 +276,24 @@ class _PackageImportScreenState extends State<PackageImportScreen> {
     });
 
     try {
-      final importedCard = GalleryCard.fromJson(card.toJson());
+      final manifest = inspection.manifest;
+      final packageName = inspection.packageFile.uri.pathSegments.isEmpty
+          ? inspection.packageFile.path
+          : inspection.packageFile.uri.pathSegments.last;
+
+      final importedCard = GalleryCard.fromJson(card.toJson())
+        ..importedContentHash = _incomingContentHash
+        ..importedAt = DateTime.now()
+        ..sourcePackageName = packageName
+        ..importedPackageVersion = manifest?.packageVersion ?? 0
+        ..importedCreatorVersion = manifest?.creatorVersion ?? ''
+        ..importWasReplacement = duplicateKind == _DuplicateKind.idConflict;
+
       await widget.store.upsertCard(importedCard);
       await inspection.dispose();
 
       if (!mounted) return;
+
       setState(() => _inspection = null);
       Navigator.of(context).pop(importedCard);
     } catch (error) {
@@ -441,8 +566,26 @@ class _PackageImportScreenState extends State<PackageImportScreen> {
   }
 
   Widget _buildBottomBar(PackageImportInspection inspection) {
+    final duplicateKind = _duplicateKind;
+
     final canImport =
-        inspection.isValid && _duplicateMessage == null && !_isBusy;
+        inspection.isValid && duplicateKind == _DuplicateKind.none && !_isBusy;
+
+    final canReplace = inspection.isValid &&
+        duplicateKind == _DuplicateKind.idConflict &&
+        !_isBusy;
+
+    final statusText = switch (duplicateKind) {
+      _DuplicateKind.exact => 'This exact card is already in your vault.',
+      _DuplicateKind.fingerprint =>
+        'This collectible is already in your vault under another card ID.',
+      _DuplicateKind.idConflict =>
+        'The card ID already exists. Review carefully before replacing it.',
+      _DuplicateKind.none => inspection.isValid
+          ? 'Package verified and ready to import.'
+          : '${inspection.errorCount} verification '
+              'error${inspection.errorCount == 1 ? '' : 's'} must be fixed.',
+    };
 
     return SafeArea(
       child: Container(
@@ -459,10 +602,7 @@ class _PackageImportScreenState extends State<PackageImportScreen> {
           children: [
             Expanded(
               child: Text(
-                _duplicateMessage ??
-                    (inspection.isValid
-                        ? 'Package verified and ready to import.'
-                        : '${inspection.errorCount} verification error${inspection.errorCount == 1 ? '' : 's'} must be fixed.'),
+                statusText,
                 style: const TextStyle(
                   color: GalleryColors.muted,
                   fontWeight: FontWeight.w700,
@@ -470,19 +610,36 @@ class _PackageImportScreenState extends State<PackageImportScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            FilledButton.icon(
-              onPressed: canImport ? _importPackage : null,
-              icon: _isImporting
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.3,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.download_done_rounded),
-              label: Text(_isImporting ? 'Importing...' : 'Import'),
-            ),
+            if (canReplace)
+              FilledButton.icon(
+                onPressed: () => _importPackage(),
+                icon: _isImporting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.3,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.sync_rounded),
+                label: Text(
+                  _isImporting ? 'Replacing...' : 'Replace Existing',
+                ),
+              )
+            else
+              FilledButton.icon(
+                onPressed: canImport ? _importPackage : null,
+                icon: _isImporting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.3,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.download_done_rounded),
+                label: Text(_isImporting ? 'Importing...' : 'Import'),
+              ),
           ],
         ),
       ),

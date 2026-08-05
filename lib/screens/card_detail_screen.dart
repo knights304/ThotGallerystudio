@@ -9,6 +9,7 @@ import '../widgets/flippable_gallery_card.dart';
 import '../widgets/living_media_gallery.dart';
 import 'card_editor_screen.dart';
 import 'package_builder_screen.dart';
+import 'nfc_card_publisher_screen.dart';
 
 class CardDetailScreen extends StatefulWidget {
   const CardDetailScreen({
@@ -106,6 +107,16 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     );
   }
 
+  Future<void> _openNfcPublisher() async {
+    card.ensureFingerprint();
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => NfcCardPublisherScreen(card: card),
+      ),
+    );
+  }
+
   Future<void> _deleteCard() async {
     final navigator = Navigator.of(context);
 
@@ -116,6 +127,20 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     }
 
     navigator.pop();
+  }
+
+  String _shortHash(String value) {
+    final trimmed = value.trim();
+
+    if (trimmed.isEmpty) {
+      return 'Not available';
+    }
+
+    if (trimmed.length <= 16) {
+      return trimmed;
+    }
+
+    return '${trimmed.substring(0, 8)}…${trimmed.substring(trimmed.length - 8)}';
   }
 
   @override
@@ -133,6 +158,10 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
             onSelected: (value) async {
               if (value == 'build-package') {
                 await _openPackageBuilder();
+              }
+
+              if (value == 'physical-nfc-card') {
+                await _openNfcPublisher();
               }
 
               if (value == 'edit') {
@@ -155,6 +184,16 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
                     Icon(Icons.inventory_2_outlined),
                     SizedBox(width: 10),
                     Text('Build Package'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'physical-nfc-card',
+                child: Row(
+                  children: [
+                    Icon(Icons.nfc_rounded),
+                    SizedBox(width: 10),
+                    Text('Physical NFC Card'),
                   ],
                 ),
               ),
@@ -294,6 +333,75 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
                     ),
                   ),
                 ],
+                if (card.hasImportProvenance) ...[
+                  const SizedBox(height: 26),
+                  Text(
+                    'Import & Authenticity',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: GalleryColors.panel,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color:
+                            GalleryColors.purpleBright.withValues(alpha: .22),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        _DetailInfoRow(
+                          icon: Icons.inventory_2_outlined,
+                          label: 'Source package',
+                          value: card.sourcePackageName.isEmpty
+                              ? 'Unknown'
+                              : card.sourcePackageName,
+                        ),
+                        _DetailInfoRow(
+                          icon: Icons.schedule_rounded,
+                          label: 'Imported',
+                          value: card.importedAt == null
+                              ? 'Unknown'
+                              : card.importedAt!.toLocal().toString(),
+                        ),
+                        _DetailInfoRow(
+                          icon: Icons.layers_outlined,
+                          label: 'Package version',
+                          value: card.importedPackageVersion <= 0
+                              ? 'Unknown'
+                              : 'TG v${card.importedPackageVersion}',
+                        ),
+                        _DetailInfoRow(
+                          icon: Icons.developer_mode_rounded,
+                          label: 'Creator version',
+                          value: card.importedCreatorVersion.isEmpty
+                              ? 'Unknown'
+                              : card.importedCreatorVersion,
+                        ),
+                        _DetailInfoRow(
+                          icon: Icons.verified_user_outlined,
+                          label: 'Verified content',
+                          value: _shortHash(card.importedContentHash),
+                        ),
+                        _DetailInfoRow(
+                          icon: card.importWasReplacement
+                              ? Icons.sync_rounded
+                              : Icons.download_done_rounded,
+                          label: 'Import action',
+                          value: card.importWasReplacement
+                              ? 'Replaced existing card'
+                              : 'Added to vault',
+                          showDivider: false,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 26),
                 FilledButton.icon(
                   onPressed: _edit,
@@ -357,6 +465,67 @@ class _StatTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DetailInfoRow extends StatelessWidget {
+  const _DetailInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.showDivider = true,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: GalleryColors.purpleBright,
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 118,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: GalleryColors.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (showDivider)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Divider(
+              height: 1,
+              color: Colors.white.withValues(alpha: .08),
+            ),
+          ),
+      ],
     );
   }
 }
