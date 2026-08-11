@@ -134,8 +134,8 @@ class _CollectibleCardState extends State<CollectibleCard>
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = card.coverImagePath != null &&
-        File(card.coverImagePath!).existsSync();
+    final hasImage =
+        card.coverImagePath != null && File(card.coverImagePath!).existsSync();
 
     final lockedMystery = card.type == GalleryCardType.mystery &&
         card.status != GalleryCardStatus.completed;
@@ -197,9 +197,7 @@ class _CollectibleCardState extends State<CollectibleCard>
                               children: [
                                 Expanded(
                                   child: Text(
-                                    lockedMystery
-                                        ? 'MYSTERY CARD'
-                                        : card.title,
+                                    lockedMystery ? 'MYSTERY CARD' : card.title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(

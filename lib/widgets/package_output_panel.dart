@@ -34,8 +34,7 @@ class PackageOutputPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _PanelHeader(
-            onChooseDirectory:
-                isBuilding ? null : onChooseDirectory,
+            onChooseDirectory: isBuilding ? null : onChooseDirectory,
           ),
           Divider(
             height: 1,

@@ -11,6 +11,7 @@ import '../features/publishing_suite/publishing_suite_screen.dart';
 import '../features/creator_profiles/creator_profiles_screen.dart';
 import '../services/creator_profile_store.dart';
 import '../features/theme_builder/theme_builder_screen.dart';
+import '../features/rate_me/rate_me_home_screen.dart';
 import 'card_detail_screen.dart';
 import 'piece_wizard_screen.dart';
 import 'package_import_screen.dart';
@@ -249,6 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
           PublishingSuiteScreen(store: widget.store, creators: widget.creators),
         4 => CreatorProfilesScreen(store: widget.creators),
         5 => const ThemeBuilderScreen(),
+        6 => const StudioRateMeHomeScreen(),
         _ => SignatureProfileScreen(store: widget.store),
       },
       floatingActionButton: _tab == 0
@@ -293,7 +295,13 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Themes',
           ),
           NavigationDestination(
+            icon: Icon(Icons.star_border_rounded),
+            selectedIcon: Icon(Icons.star_rounded),
+            label: 'Rate Me',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.badge_outlined),
+            selectedIcon: Icon(Icons.badge_rounded),
             label: 'Signature',
           ),
         ],

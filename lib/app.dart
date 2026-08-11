@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
+import 'screens/studio_auth_gate.dart';
 import 'services/creator_profile_store.dart';
 import 'services/gallery_store.dart';
 import 'theme/gallery_theme.dart';
@@ -18,7 +19,12 @@ class ThotGalleryApp extends StatelessWidget {
       title: 'Thot Gallery Creator v2',
       debugShowCheckedModeBanner: false,
       theme: GalleryTheme.dark,
-      home: HomeScreen(store: store, creators: creators),
+      home: StudioAuthGate(
+        child: HomeScreen(
+          store: store,
+          creators: creators,
+        ),
+      ),
     );
   }
 }

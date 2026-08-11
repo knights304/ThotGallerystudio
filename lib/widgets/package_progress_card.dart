@@ -157,8 +157,7 @@ class PackageProgressCard extends StatelessWidget {
         badgeLabel: 'Building',
         defaultMessage: 'Preparing your TG package...',
         accentColor: GalleryColors.purpleBright,
-        borderColor:
-            GalleryColors.purpleBright.withValues(alpha: 0.35),
+        borderColor: GalleryColors.purpleBright.withValues(alpha: 0.35),
       );
     }
 
@@ -314,9 +313,7 @@ class _ProgressTrack extends StatelessWidget {
         minHeight: 11,
         backgroundColor: GalleryColors.panel,
         valueColor: AlwaysStoppedAnimation<Color>(
-          isComplete
-              ? Colors.greenAccent
-              : GalleryColors.purpleBright,
+          isComplete ? Colors.greenAccent : GalleryColors.purpleBright,
         ),
       ),
     );

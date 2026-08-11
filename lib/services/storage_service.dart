@@ -15,15 +15,11 @@ class StorageService {
   }
 
   static int photoCount(Iterable<GalleryMediaItem> media) {
-    return media
-        .where((item) => item.type == GalleryMediaType.photo)
-        .length;
+    return media.where((item) => item.type == GalleryMediaType.photo).length;
   }
 
   static int videoCount(Iterable<GalleryMediaItem> media) {
-    return media
-        .where((item) => item.type == GalleryMediaType.video)
-        .length;
+    return media.where((item) => item.type == GalleryMediaType.video).length;
   }
 
   static bool isWithinStorageLimit(

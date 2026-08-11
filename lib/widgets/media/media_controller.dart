@@ -21,13 +21,11 @@ class MediaController extends ChangeNotifier {
 
   int get totalCount => _media.length;
 
-  int get photoCount => _media
-      .where((item) => item.type == GalleryMediaType.photo)
-      .length;
+  int get photoCount =>
+      _media.where((item) => item.type == GalleryMediaType.photo).length;
 
-  int get videoCount => _media
-      .where((item) => item.type == GalleryMediaType.video)
-      .length;
+  int get videoCount =>
+      _media.where((item) => item.type == GalleryMediaType.video).length;
 
   bool get isEmpty => _media.isEmpty;
   bool get isNotEmpty => _media.isNotEmpty;
@@ -65,8 +63,7 @@ class MediaController extends ChangeNotifier {
   }
 
   void toggleSelection(GalleryMediaItem item) {
-    _selectedMediaId =
-        _selectedMediaId == item.id ? null : item.id;
+    _selectedMediaId = _selectedMediaId == item.id ? null : item.id;
     notifyListeners();
   }
 
@@ -113,9 +110,7 @@ class MediaController extends ChangeNotifier {
     final oldIndex = indexOfId(draggedMediaId);
     final targetIndex = indexOfId(targetMediaId);
 
-    if (oldIndex == -1 ||
-        targetIndex == -1 ||
-        oldIndex == targetIndex) {
+    if (oldIndex == -1 || targetIndex == -1 || oldIndex == targetIndex) {
       return false;
     }
 

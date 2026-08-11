@@ -21,31 +21,38 @@ class RecommendationService {
     }
 
     if ((card.coverImagePath ?? '').trim().isEmpty) {
-      recommendations.add('Choose a cover image to make the card presentation-ready.');
+      recommendations
+          .add('Choose a cover image to make the card presentation-ready.');
     }
 
     if (card.description.trim().isEmpty) {
-      recommendations.add('Add a short story or summary to give the card context.');
+      recommendations
+          .add('Add a short story or summary to give the card context.');
     }
 
     if (media.isEmpty) {
-      recommendations.add('Add at least one photo or video to bring this card to life.');
+      recommendations
+          .add('Add at least one photo or video to bring this card to life.');
     }
 
     if (card.tags.isEmpty) {
-      recommendations.add('Add a few tags so this card is easier to organize and discover.');
+      recommendations.add(
+          'Add a few tags so this card is easier to organize and discover.');
     }
 
     if (totalBytes > maximumBytes) {
-      recommendations.add('Reduce the media size before export. The package is over its storage limit.');
+      recommendations.add(
+          'Reduce the media size before export. The package is over its storage limit.');
     }
 
     if (photoCount > maximumPhotos) {
-      recommendations.add('Remove ${photoCount - maximumPhotos} photo${photoCount - maximumPhotos == 1 ? '' : 's'} to meet the photo limit.');
+      recommendations.add(
+          'Remove ${photoCount - maximumPhotos} photo${photoCount - maximumPhotos == 1 ? '' : 's'} to meet the photo limit.');
     }
 
     if (videoCount > maximumVideos) {
-      recommendations.add('Remove ${videoCount - maximumVideos} video${videoCount - maximumVideos == 1 ? '' : 's'} to meet the video limit.');
+      recommendations.add(
+          'Remove ${videoCount - maximumVideos} video${videoCount - maximumVideos == 1 ? '' : 's'} to meet the video limit.');
     }
 
     final missingMetadata = media.where(

@@ -4,12 +4,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/gallery_card.dart';
 import '../services/gallery_store.dart';
+import '../services/gallery_card_rate_me_service.dart';
 import '../theme/gallery_theme.dart';
 import '../widgets/flippable_gallery_card.dart';
 import '../widgets/living_media_gallery.dart';
 import 'card_editor_screen.dart';
 import 'package_builder_screen.dart';
 import 'nfc_card_publisher_screen.dart';
+import 'rate_me_editor_screen.dart';
 
 class CardDetailScreen extends StatefulWidget {
   const CardDetailScreen({
@@ -117,6 +119,43 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     );
   }
 
+  Future<void> _createRateMeCard() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final rateMeCard =
+          await GalleryCardRateMeService.createFromGalleryCard(card);
+
+      if (!mounted) return;
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Created “${rateMeCard.title}” with '
+            '${rateMeCard.media.length} media item'
+            '${rateMeCard.media.length == 1 ? '' : 's'}.',
+          ),
+        ),
+      );
+
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => StudioRateMeEditorScreen(
+            initialCard: rateMeCard,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not create Rate Me card: $error'),
+        ),
+      );
+    }
+  }
+
   Future<void> _deleteCard() async {
     final navigator = Navigator.of(context);
 
@@ -164,6 +203,10 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
                 await _openNfcPublisher();
               }
 
+              if (value == 'create-rate-me') {
+                await _createRateMeCard();
+              }
+
               if (value == 'edit') {
                 await _edit();
               }
@@ -194,6 +237,16 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
                     Icon(Icons.nfc_rounded),
                     SizedBox(width: 10),
                     Text('Physical NFC Card'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'create-rate-me',
+                child: Row(
+                  children: [
+                    Icon(Icons.star_rounded),
+                    SizedBox(width: 10),
+                    Text('Create Rate Me Card'),
                   ],
                 ),
               ),

@@ -301,8 +301,7 @@ class _MediaManagerState extends State<MediaManager> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: media.length,
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: columnCount,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,

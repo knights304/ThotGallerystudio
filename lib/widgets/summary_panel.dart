@@ -259,8 +259,9 @@ class _MetadataList extends StatelessWidget {
         ),
         _SummaryRow(
           label: 'Set',
-          value:
-              card.setName.trim().isEmpty ? 'Not assigned' : card.setName.trim(),
+          value: card.setName.trim().isEmpty
+              ? 'Not assigned'
+              : card.setName.trim(),
         ),
         _SummaryRow(
           label: 'Rarity',

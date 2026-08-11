@@ -35,13 +35,11 @@ class DashboardService {
     final trimmedDescription = description.trim();
     final trimmedCoverPath = (coverImagePath ?? '').trim();
 
-    final photoCount = media
-        .where((item) => item.type == GalleryMediaType.photo)
-        .length;
+    final photoCount =
+        media.where((item) => item.type == GalleryMediaType.photo).length;
 
-    final videoCount = media
-        .where((item) => item.type == GalleryMediaType.video)
-        .length;
+    final videoCount =
+        media.where((item) => item.type == GalleryMediaType.video).length;
 
     final totalBytes = media.fold<int>(
       0,
@@ -85,16 +83,13 @@ class DashboardService {
       DashboardCheck(
         label: 'Card title',
         isComplete: hasTitle,
-        detail: hasTitle
-            ? 'A title is ready.'
-            : 'Add a title before exporting.',
+        detail:
+            hasTitle ? 'A title is ready.' : 'Add a title before exporting.',
       ),
       DashboardCheck(
         label: 'Cover image',
         isComplete: hasCover,
-        detail: hasCover
-            ? 'Cover art is selected.'
-            : 'Choose a cover image.',
+        detail: hasCover ? 'Cover art is selected.' : 'Choose a cover image.',
       ),
       DashboardCheck(
         label: 'Media attached',
@@ -193,8 +188,7 @@ class DashboardService {
       );
     }
 
-    final isExportReady =
-        exportChecks.every((check) => check.isComplete);
+    final isExportReady = exportChecks.every((check) => check.isComplete);
 
     return CreatorDashboardData(
       healthScore: healthScore,

@@ -55,8 +55,8 @@ class InfoPill extends StatelessWidget {
         color: backgroundColor ?? GalleryColors.panel,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: borderColor ??
-              GalleryColors.purpleBright.withValues(alpha: 0.15),
+          color:
+              borderColor ?? GalleryColors.purpleBright.withValues(alpha: 0.15),
         ),
       ),
       child: Row(

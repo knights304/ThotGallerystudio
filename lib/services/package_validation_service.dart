@@ -78,9 +78,7 @@ class PackageValidationReport {
     required this.photoCount,
     required this.videoCount,
     required this.createdAt,
-  }
-  
-  );
+  });
 
   final List<PackageValidationIssue> issues;
   final int estimatedSizeBytes;
@@ -138,8 +136,7 @@ class PackageValidationService {
 
   static const int largePackageThresholdBytes = 1024 * 1024 * 1024;
 
-  static const int veryLargePackageThresholdBytes =
-      4 * 1024 * 1024 * 1024;
+  static const int veryLargePackageThresholdBytes = 4 * 1024 * 1024 * 1024;
 
   static Future<PackageValidationReport> validate(
     GalleryCard card,
@@ -165,8 +162,7 @@ class PackageValidationService {
           code: PackageValidationCode.missingCover,
           severity: PackageValidationSeverity.error,
           title: 'Cover image required',
-          message:
-              'Choose a cover image before building the TG package.',
+          message: 'Choose a cover image before building the TG package.',
         ),
       );
     } else {
@@ -234,8 +230,7 @@ class PackageValidationService {
             code: PackageValidationCode.emptyMediaPath,
             severity: PackageValidationSeverity.error,
             title: 'Media path is empty',
-            message:
-                'A media item does not contain a usable file path.',
+            message: 'A media item does not contain a usable file path.',
             mediaId: media.id,
           ),
         );
@@ -267,8 +262,7 @@ class PackageValidationService {
       if (hash.isNotEmpty) {
         final duplicateHashItem = contentHashes[hash];
 
-        if (duplicateHashItem != null &&
-            duplicateHashItem.path != media.path) {
+        if (duplicateHashItem != null && duplicateHashItem.path != media.path) {
           issues.add(
             PackageValidationIssue(
               code: PackageValidationCode.duplicateMediaHash,
@@ -317,8 +311,7 @@ class PackageValidationService {
               code: PackageValidationCode.invalidMediaSize,
               severity: PackageValidationSeverity.error,
               title: 'Media file is empty',
-              message:
-                  '${p.basename(mediaPath)} contains no readable data.',
+              message: '${p.basename(mediaPath)} contains no readable data.',
               filePath: mediaPath,
               mediaId: media.id,
             ),
@@ -330,8 +323,7 @@ class PackageValidationService {
             code: PackageValidationCode.invalidMediaSize,
             severity: PackageValidationSeverity.error,
             title: 'Media file cannot be read',
-            message:
-                'TG could not read ${p.basename(mediaPath)}.',
+            message: 'TG could not read ${p.basename(mediaPath)}.',
             filePath: mediaPath,
             mediaId: media.id,
           ),
@@ -352,8 +344,7 @@ class PackageValidationService {
           code: PackageValidationCode.validPackage,
           severity: PackageValidationSeverity.info,
           title: 'Package is ready',
-          message:
-              'All required metadata and media files passed validation.',
+          message: 'All required metadata and media files passed validation.',
         ),
       );
     }
@@ -379,8 +370,7 @@ class PackageValidationService {
           code: PackageValidationCode.missingTitle,
           severity: PackageValidationSeverity.error,
           title: 'Title required',
-          message:
-              'Enter a title before building the TG package.',
+          message: 'Enter a title before building the TG package.',
         ),
       );
     }
@@ -403,8 +393,7 @@ class PackageValidationService {
           code: PackageValidationCode.missingSetName,
           severity: PackageValidationSeverity.warning,
           title: 'Set name is empty',
-          message:
-              'Add a set name to keep exported cards organized.',
+          message: 'Add a set name to keep exported cards organized.',
         ),
       );
     }
@@ -415,8 +404,7 @@ class PackageValidationService {
           code: PackageValidationCode.missingRarity,
           severity: PackageValidationSeverity.warning,
           title: 'Rarity is empty',
-          message:
-              'Choose a rarity before publishing this card.',
+          message: 'Choose a rarity before publishing this card.',
         ),
       );
     }
@@ -464,8 +452,7 @@ class PackageValidationService {
             code: PackageValidationCode.missingFingerprint,
             severity: PackageValidationSeverity.error,
             title: 'Fingerprint unavailable',
-            message:
-                'TG could not generate a fingerprint for this card.',
+            message: 'TG could not generate a fingerprint for this card.',
           ),
         );
       }
@@ -500,8 +487,7 @@ class PackageValidationService {
           code: PackageValidationCode.invalidVideoDuration,
           severity: PackageValidationSeverity.warning,
           title: 'Video duration unavailable',
-          message:
-              '$filename does not contain recorded duration metadata.',
+          message: '$filename does not contain recorded duration metadata.',
           filePath: media.path,
           mediaId: media.id,
         ),
@@ -533,8 +519,7 @@ class PackageValidationService {
           code: PackageValidationCode.largePackage,
           severity: PackageValidationSeverity.warning,
           title: 'Large package',
-          message:
-              'This package is approximately ${formatBytes(sizeBytes)}.',
+          message: 'This package is approximately ${formatBytes(sizeBytes)}.',
         ),
       );
     }

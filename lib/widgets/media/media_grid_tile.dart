@@ -54,7 +54,6 @@ class MediaGridTile extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-
               //--------------------------------------------------
               // Thumbnail
               //--------------------------------------------------
@@ -194,8 +193,7 @@ class MediaGridTile extends StatelessWidget {
                     }
                   },
                   itemBuilder: (context) => [
-                    if (!isCover &&
-                        mediaItem.type == GalleryMediaType.photo)
+                    if (!isCover && mediaItem.type == GalleryMediaType.photo)
                       const PopupMenuItem(
                         value: 'cover',
                         child: Row(

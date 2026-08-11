@@ -16,8 +16,7 @@ class CoverPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasCover =
-        coverPath != null &&
+    final hasCover = coverPath != null &&
         coverPath!.trim().isNotEmpty &&
         File(coverPath!).existsSync();
 

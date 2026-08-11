@@ -264,12 +264,10 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
         fingerprint: existing?.fingerprint ?? '',
         views: existing?.views ?? 0,
         shareCount: existing?.shareCount ?? 0,
-        photoCount: _media
-            .where((item) => item.type == GalleryMediaType.photo)
-            .length,
-        videoCount: _media
-            .where((item) => item.type == GalleryMediaType.video)
-            .length,
+        photoCount:
+            _media.where((item) => item.type == GalleryMediaType.photo).length,
+        videoCount:
+            _media.where((item) => item.type == GalleryMediaType.video).length,
         locationCount: int.tryParse(_locationCount.text.trim()) ?? 0,
         peopleCount: int.tryParse(_peopleCount.text.trim()) ?? 0,
         cardNumber: int.tryParse(_cardNumber.text.trim()) ?? 1,
@@ -299,8 +297,8 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasCover = _coverImagePath != null &&
-        File(_coverImagePath!).existsSync();
+    final hasCover =
+        _coverImagePath != null && File(_coverImagePath!).existsSync();
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.existing == null ? 'Create Card' : 'Edit Card'),
@@ -382,23 +380,32 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
                 initialValue: _imageFit,
                 decoration: const InputDecoration(
                   labelText: 'Photo fit',
-                  helperText: 'Cover fills the frame. Contain shows the whole photo.',
+                  helperText:
+                      'Cover fills the frame. Contain shows the whole photo.',
                 ),
-                items: GalleryImageFit.values.map((fit) => DropdownMenuItem(
-                  value: fit,
-                  child: Text(fit.name),
-                )).toList(),
+                items: GalleryImageFit.values
+                    .map((fit) => DropdownMenuItem(
+                          value: fit,
+                          child: Text(fit.name),
+                        ))
+                    .toList(),
                 onChanged: (value) => setState(() => _imageFit = value!),
               ),
               const SizedBox(height: 10),
               Text('Move left/right: ${_imageAlignmentX.toStringAsFixed(2)}'),
               Slider(
-                min: -1, max: 1, divisions: 40, value: _imageAlignmentX,
+                min: -1,
+                max: 1,
+                divisions: 40,
+                value: _imageAlignmentX,
                 onChanged: (value) => setState(() => _imageAlignmentX = value),
               ),
               Text('Move up/down: ${_imageAlignmentY.toStringAsFixed(2)}'),
               Slider(
-                min: -1, max: 1, divisions: 40, value: _imageAlignmentY,
+                min: -1,
+                max: 1,
+                divisions: 40,
+                value: _imageAlignmentY,
                 onChanged: (value) => setState(() => _imageAlignmentY = value),
               ),
             ],

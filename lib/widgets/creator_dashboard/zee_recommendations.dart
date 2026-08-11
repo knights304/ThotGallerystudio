@@ -54,7 +54,8 @@ class ZeeRecommendations extends StatelessWidget {
                     color: CreatorDashboardTheme.panel,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: CreatorDashboardTheme.purple.withValues(alpha: 0.20),
+                      color:
+                          CreatorDashboardTheme.purple.withValues(alpha: 0.20),
                     ),
                   ),
                   child: Row(

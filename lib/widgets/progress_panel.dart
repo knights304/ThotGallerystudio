@@ -34,15 +34,12 @@ class ProgressPanel extends StatelessWidget {
           children: [
             const _Header(),
             const SizedBox(height: 20),
-
             LinearProgressIndicator(
               value: isBuilding ? progress : null,
               minHeight: 10,
               borderRadius: BorderRadius.circular(8),
             ),
-
             const SizedBox(height: 16),
-
             Row(
               children: [
                 Expanded(
@@ -61,22 +58,17 @@ class ProgressPanel extends StatelessWidget {
                 ),
               ],
             ),
-
-            if (outputPath != null &&
-                outputPath!.trim().isNotEmpty) ...[
+            if (outputPath != null && outputPath!.trim().isNotEmpty) ...[
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 12),
-
               const Text(
                 'Output',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               SelectableText(
                 outputPath!,
                 style: const TextStyle(
