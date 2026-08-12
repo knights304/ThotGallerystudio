@@ -7,9 +7,11 @@ import 'package:video_player/video_player.dart';
 
 import '../models/rate_me_card.dart';
 import '../services/rate_me_package_service.dart';
+import '../services/studio_cloud_service.dart';
 import '../services/rate_me_response_service.dart';
 import '../services/rate_me_store.dart';
 import 'rate_me_responses_screen.dart';
+import 'studio_rate_me_recipient_picker_screen.dart';
 
 class StudioRateMeEditorScreen extends StatefulWidget {
   const StudioRateMeEditorScreen({
@@ -304,12 +306,119 @@ class _StudioRateMeEditorScreenState extends State<StudioRateMeEditorScreen> {
     setState(() => _card = saved);
   }
 
+  Future<String?> _chooseCardDestination() {
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            4,
+            16,
+            18,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Send Rate Me Card',
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Choose how you want to send this Rate Me card.',
+                style: TextStyle(
+                  color: Colors.white60,
+                ),
+              ),
+              const SizedBox(height: 14),
+              ListTile(
+                leading: const Icon(
+                  Icons.people_alt_outlined,
+                ),
+                title: const Text(
+                  'Send to Viewer',
+                ),
+                subtitle: const Text(
+                  'Search for a THOT Gallery Viewer account.',
+                ),
+                onTap: () => Navigator.pop(
+                  sheetContext,
+                  'viewer',
+                ),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.business_rounded,
+                ),
+                title: const Text(
+                  'Send to Studio',
+                ),
+                subtitle: const Text(
+                  'Search for another THOT Gallery Studio account.',
+                ),
+                onTap: () => Navigator.pop(
+                  sheetContext,
+                  'studio',
+                ),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.share_outlined,
+                ),
+                title: const Text(
+                  'Share through device',
+                ),
+                subtitle: const Text(
+                  'Send the .tgrate file using Android sharing.',
+                ),
+                onTap: () => Navigator.pop(
+                  sheetContext,
+                  'normal',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _exportAndShare() async {
     if (_busy) return;
 
     if (_card.media.isEmpty) {
-      _message('Add at least one photo or video first.');
+      _message(
+        'Add at least one photo or video first.',
+      );
       return;
+    }
+
+    final destination = await _chooseCardDestination();
+
+    if (destination == null || !mounted) {
+      return;
+    }
+
+    StudioCloudProfile? recipient;
+
+    if (destination == 'viewer' || destination == 'studio') {
+      recipient = await Navigator.of(context).push<StudioCloudProfile>(
+        MaterialPageRoute(
+          builder: (_) => StudioRateMeRecipientPickerScreen(
+            profileType: destination,
+          ),
+        ),
+      );
+
+      if (recipient == null || !mounted) {
+        return;
+      }
     }
 
     setState(() => _busy = true);
@@ -319,43 +428,81 @@ class _StudioRateMeEditorScreenState extends State<StudioRateMeEditorScreen> {
         _draft(),
       );
 
-      final exported = await StudioRateMePackageService.exportCard(
-        saved,
-      );
-
       if (!mounted) return;
 
       setState(() => _card = saved);
 
-      final filename = exported.file.uri.pathSegments.last;
+      final exported = await StudioRateMePackageService.exportCard(
+        saved,
+      );
 
-      final result = await SharePlus.instance.share(
-        ShareParams(
-          title: 'Share ${saved.title}',
-          subject: '${saved.title} · THOT Gallery Rate Me',
-          text:
-              'Open this Rate Me card in THOT Gallery Viewer and tell me what you think.',
-          files: [
-            XFile(
-              exported.file.path,
-              mimeType: 'application/zip',
-              name: filename,
-            ),
-          ],
-          fileNameOverrides: [filename],
-        ),
+      if (destination == 'normal') {
+        final filename = exported.file.uri.pathSegments.last;
+
+        final result = await SharePlus.instance.share(
+          ShareParams(
+            title: 'Share ${saved.title}',
+            subject: '${saved.title} · THOT Gallery Rate Me',
+            text:
+                'Open this Rate Me card in THOT Gallery and tell me what you think.',
+            files: [
+              XFile(
+                exported.file.path,
+                mimeType: 'application/zip',
+                name: filename,
+              ),
+            ],
+            fileNameOverrides: [
+              filename,
+            ],
+          ),
+        );
+
+        if (!mounted) return;
+
+        if (result.status == ShareResultStatus.success) {
+          _message(
+            'Rate Me card shared.',
+          );
+        } else if (result.status == ShareResultStatus.dismissed) {
+          _message(
+            'Share canceled.',
+          );
+        }
+
+        return;
+      }
+
+      final upload = await StudioCloudService.instance.uploadRateMePackage(
+        cardId: saved.id,
+        file: exported.file,
+      );
+
+      await StudioCloudService.instance.sendRateMe(
+        recipientProfileId: recipient!.id,
+        cardId: saved.id,
+        packageKey: upload.packageKey,
       );
 
       if (!mounted) return;
 
-      if (result.status == ShareResultStatus.success) {
-        _message('Rate Me card shared.');
-      } else if (result.status == ShareResultStatus.dismissed) {
-        _message('Share canceled.');
-      }
+      _message(
+        'Rate Me sent directly to '
+        '${recipient.displayName}.',
+      );
+    } on StudioCloudException catch (error) {
+      if (!mounted) return;
+
+      _message(
+        'Could not send Rate Me: '
+        '${error.message}',
+      );
     } catch (error) {
       if (!mounted) return;
-      _message('Could not export Rate Me card: $error');
+
+      _message(
+        'Could not send Rate Me card: $error',
+      );
     } finally {
       if (mounted) {
         setState(() => _busy = false);

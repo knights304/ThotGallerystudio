@@ -597,6 +597,37 @@ class StudioCloudService {
         .toList(growable: false);
   }
 
+  Future<Uint8List> downloadResponsePackage(
+    String responseId,
+  ) async {
+    final normalized = responseId.trim();
+
+    if (normalized.isEmpty) {
+      throw const StudioCloudException(
+        'Response ID is required.',
+      );
+    }
+
+    final response = await http.get(
+      Uri.parse(
+        '$baseUrl/rate-me/responses/'
+        '$normalized/package',
+      ),
+      headers: await _authorizedHeaders(
+        contentType: null,
+      ),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StudioCloudException(
+        'Unable to download Rate Me response package.',
+        statusCode: response.statusCode,
+      );
+    }
+
+    return response.bodyBytes;
+  }
+
   Future<void> archiveDelivery(String deliveryId) async {
     final normalized = deliveryId.trim();
 

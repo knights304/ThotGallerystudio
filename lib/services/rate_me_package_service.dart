@@ -226,9 +226,6 @@ class StudioRateMePackageService {
         await outputFile.delete();
       }
 
-      final encoder = ZipFileEncoder();
-      encoder.create(outputFile.path);
-
       final files = await exportRoot
           .list(recursive: true, followLinks: false)
           .where((entity) => entity is File)
@@ -238,18 +235,38 @@ class StudioRateMePackageService {
       files.sort((a, b) => a.path.compareTo(b.path));
 
       if (files.isEmpty) {
-        encoder.close();
         throw StateError('Rate Me export contains no files.');
       }
+
+      final zipArchive = Archive();
 
       for (final file in files) {
         final relative =
             p.relative(file.path, from: exportRoot.path).replaceAll('\\', '/');
 
-        encoder.addFile(file, relative);
+        final bytes = await file.readAsBytes();
+
+        zipArchive.addFile(
+          ArchiveFile(
+            relative,
+            bytes.length,
+            bytes,
+          ),
+        );
       }
 
-      encoder.close();
+      final encoded = ZipEncoder().encode(zipArchive);
+
+      if (encoded.isEmpty) {
+        throw StateError(
+          'Rate Me package encoder returned no data.',
+        );
+      }
+
+      await outputFile.writeAsBytes(
+        encoded,
+        flush: true,
+      );
 
       if (!await outputFile.exists()) {
         throw StateError('Rate Me package was not created.');

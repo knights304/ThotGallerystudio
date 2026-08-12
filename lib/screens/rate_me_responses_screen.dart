@@ -1,11 +1,14 @@
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
 import '../models/rate_me_card.dart';
 import '../services/rate_me_response_service.dart';
+import '../services/studio_cloud_service.dart';
 import '../widgets/eggplant_rating.dart';
 
 class StudioRateMeResponsesScreen extends StatefulWidget {
@@ -39,10 +42,133 @@ class _StudioRateMeResponsesScreenState
     _load();
   }
 
+  Future<void> _syncCloudResponses() async {
+    try {
+      final localResponses = await StudioRateMeResponseService.loadForCard(
+        widget.card.id,
+      );
+
+      final installedCloudIds = <String>{};
+
+      for (final stored in localResponses) {
+        final marker = File(
+          '${stored.directory.path}'
+          '${Platform.pathSeparator}'
+          'cloud_response_id.txt',
+        );
+
+        if (!await marker.exists()) {
+          continue;
+        }
+
+        final responseId = (await marker.readAsString()).trim();
+
+        if (responseId.isNotEmpty) {
+          installedCloudIds.add(responseId);
+        }
+      }
+
+      final cloudResponses =
+          await StudioCloudService.instance.getResponseInbox();
+
+      for (final cloudResponse in cloudResponses) {
+        if (cloudResponse.cardId != widget.card.id) {
+          continue;
+        }
+
+        if (installedCloudIds.contains(
+          cloudResponse.id,
+        )) {
+          continue;
+        }
+
+        final packageKey = cloudResponse.responsePackageKey?.trim() ?? '';
+
+        // Typed/rating-only cloud responses do not
+        // have a multimedia package to download.
+        if (packageKey.isEmpty) {
+          continue;
+        }
+
+        File? temporaryPackage;
+
+        try {
+          final bytes =
+              await StudioCloudService.instance.downloadResponsePackage(
+            cloudResponse.id,
+          );
+
+          if (bytes.length <= 22) {
+            continue;
+          }
+
+          final temporary = await getTemporaryDirectory();
+
+          temporaryPackage = File(
+            '${temporary.path}'
+            '${Platform.pathSeparator}'
+            'studio_cloud_response_'
+            '${cloudResponse.id}_'
+            '${DateTime.now().microsecondsSinceEpoch}'
+            '.tgrateresponse',
+          );
+
+          await temporaryPackage.writeAsBytes(
+            bytes,
+            flush: true,
+          );
+
+          final imported = await StudioRateMeResponseService.importPackage(
+            temporaryPackage,
+          );
+
+          if (imported.response.cardId != widget.card.id) {
+            if (await imported.storageDirectory.exists()) {
+              await imported.storageDirectory.delete(
+                recursive: true,
+              );
+            }
+
+            continue;
+          }
+
+          final marker = File(
+            '${imported.storageDirectory.path}'
+            '${Platform.pathSeparator}'
+            'cloud_response_id.txt',
+          );
+
+          await marker.writeAsString(
+            cloudResponse.id,
+            flush: true,
+          );
+
+          installedCloudIds.add(
+            cloudResponse.id,
+          );
+        } catch (_) {
+          // A single malformed/missing package should
+          // not prevent other responses from loading.
+        } finally {
+          if (temporaryPackage != null && await temporaryPackage.exists()) {
+            await temporaryPackage.delete();
+          }
+        }
+      }
+    } on StudioCloudException {
+      // Local responses remain available if Studio
+      // is offline or the cloud session has expired.
+    } catch (_) {
+      // Cloud synchronization is best-effort.
+    }
+  }
+
   Future<void> _load() async {
     if (mounted) {
       setState(() => _loading = true);
     }
+
+    await _syncCloudResponses();
 
     final responses = await StudioRateMeResponseService.loadForCard(
       widget.card.id,
@@ -139,7 +265,7 @@ class _StudioRateMeResponsesScreenState
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Response?'),
         content: Text(
-          'Delete the response from $name and its local video reply?',
+          'Delete the response from $name and its local media attachments?',
         ),
         actions: [
           TextButton(
@@ -156,10 +282,54 @@ class _StudioRateMeResponsesScreenState
 
     if (confirmed != true) return;
 
-    await StudioRateMeResponseService.deleteResponse(stored);
+    String? cloudResponseId;
+
+    final cloudMarker = File(
+      '${stored.directory.path}'
+      '${Platform.pathSeparator}'
+      'cloud_response_id.txt',
+    );
+
+    if (await cloudMarker.exists()) {
+      final rawCloudId = (await cloudMarker.readAsString()).trim();
+
+      if (rawCloudId.isNotEmpty) {
+        cloudResponseId = rawCloudId;
+      }
+    }
+
+    if (cloudResponseId != null) {
+      try {
+        await StudioCloudService.instance.deleteCloudResponse(
+          cloudResponseId,
+        );
+      } on StudioCloudException catch (error) {
+        if (!mounted) return;
+
+        _message(
+          'Could not delete cloud response: '
+          '${error.message}',
+        );
+
+        return;
+      }
+    }
+
+    await StudioRateMeResponseService.deleteResponse(
+      stored,
+    );
 
     if (!mounted) return;
+
     await _load();
+
+    if (!mounted) return;
+
+    _message(
+      cloudResponseId == null
+          ? 'Local response deleted.'
+          : 'Response deleted from Studio and cloud.',
+    );
   }
 
   void _message(String message) {
@@ -506,10 +676,23 @@ class _ResponseCard extends StatelessWidget {
     final favorites =
         response.favoriteMediaIds.map((id) => _mediaLabel(card, id)).toList();
 
-    final replyPath = response.videoReplyPath;
-    final hasReply = replyPath != null &&
-        replyPath.trim().isNotEmpty &&
-        File(replyPath).existsSync();
+    final photoReplyPath = response.photoReplyPath;
+    final videoReplyPath = response.videoReplyPath;
+    final voiceReplyPath = response.voiceReplyPath;
+
+    final hasPhotoReply = photoReplyPath != null &&
+        photoReplyPath.trim().isNotEmpty &&
+        File(photoReplyPath).existsSync();
+
+    final hasVideoReply = videoReplyPath != null &&
+        videoReplyPath.trim().isNotEmpty &&
+        File(videoReplyPath).existsSync();
+
+    final hasVoiceReply = voiceReplyPath != null &&
+        voiceReplyPath.trim().isNotEmpty &&
+        File(voiceReplyPath).existsSync();
+
+    final hasAnyAttachment = hasPhotoReply || hasVideoReply || hasVoiceReply;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -529,7 +712,9 @@ class _ResponseCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              response.hasRating ? '${response.overallRating}/5' : 'No rating',
+              response.hasRating
+                  ? '${response.overallRating.toStringAsFixed(1)} / 5.0'
+                  : 'No rating',
             ),
           ],
         ),
@@ -592,8 +777,29 @@ class _ResponseCard extends StatelessWidget {
                     ],
                   ),
                 ],
-                if (hasReply) ...[
+                if (hasPhotoReply) ...[
                   if (response.hasComment || favorites.isNotEmpty)
+                    const SizedBox(height: 18),
+                  const Text(
+                    'Photo Reply',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.file(
+                      File(photoReplyPath),
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ],
+                if (hasVideoReply) ...[
+                  if (response.hasComment ||
+                      favorites.isNotEmpty ||
+                      hasPhotoReply)
                     const SizedBox(height: 18),
                   const Text(
                     'Video Reply',
@@ -602,9 +808,30 @@ class _ResponseCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  _VideoReplyPlayer(path: replyPath),
+                  _VideoReplyPlayer(
+                    path: videoReplyPath,
+                  ),
                 ],
-                if (!response.hasComment && favorites.isEmpty && !hasReply) ...[
+                if (hasVoiceReply) ...[
+                  if (response.hasComment ||
+                      favorites.isNotEmpty ||
+                      hasPhotoReply ||
+                      hasVideoReply)
+                    const SizedBox(height: 18),
+                  const Text(
+                    'Voice Reply',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _VoiceReplyPlayer(
+                    path: voiceReplyPath,
+                  ),
+                ],
+                if (!response.hasComment &&
+                    favorites.isEmpty &&
+                    !hasAnyAttachment) ...[
                   const Text(
                     'This response contains only an overall rating.',
                     style: TextStyle(
@@ -661,6 +888,104 @@ class _StarDisplay extends StatelessWidget {
       value: rating,
       size: size,
       showValue: false,
+    );
+  }
+}
+
+class _VoiceReplyPlayer extends StatefulWidget {
+  const _VoiceReplyPlayer({
+    required this.path,
+  });
+
+  final String path;
+
+  @override
+  State<_VoiceReplyPlayer> createState() => _VoiceReplyPlayerState();
+}
+
+class _VoiceReplyPlayerState extends State<_VoiceReplyPlayer> {
+  final AudioPlayer _player = AudioPlayer();
+
+  bool _playing = false;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _playing = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    try {
+      if (_playing) {
+        await _player.stop();
+
+        if (mounted) {
+          setState(() {
+            _playing = false;
+          });
+        }
+
+        return;
+      }
+
+      await _player.play(
+        DeviceFileSource(widget.path),
+      );
+
+      if (mounted) {
+        setState(() {
+          _playing = true;
+          _failed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _playing = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: IconButton(
+          onPressed: _failed ? null : _toggle,
+          iconSize: 38,
+          icon: Icon(
+            _playing
+                ? Icons.stop_circle_rounded
+                : Icons.play_circle_fill_rounded,
+          ),
+        ),
+        title: Text(
+          _failed
+              ? 'Voice reply unavailable'
+              : _playing
+                  ? 'Playing voice reply'
+                  : 'Play voice reply',
+        ),
+        subtitle: const Text(
+          'Audio response',
+        ),
+      ),
     );
   }
 }

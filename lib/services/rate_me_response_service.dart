@@ -34,7 +34,7 @@ class StudioRateMeResponseService {
   const StudioRateMeResponseService._();
 
   static const String format = 'thotgallery-rate-me-response';
-  static const int currentFormatVersion = 2;
+  static const int currentFormatVersion = 3;
 
   static Future<Directory> _root() async {
     final support = await getApplicationSupportDirectory();
@@ -163,12 +163,27 @@ class StudioRateMeResponseService {
         destination,
       );
 
-      final replyPath = portableResponse.videoReplyPath;
+      String? installedReplyPath(String? relativePath) {
+        if (relativePath == null || relativePath.trim().isEmpty) {
+          return null;
+        }
+
+        return p.join(
+          destination.path,
+          relativePath,
+        );
+      }
 
       final installedResponse = portableResponse.copyWith(
-        videoReplyPath: replyPath == null || replyPath.trim().isEmpty
-            ? null
-            : p.join(destination.path, replyPath),
+        photoReplyPath: installedReplyPath(
+          portableResponse.photoReplyPath,
+        ),
+        videoReplyPath: installedReplyPath(
+          portableResponse.videoReplyPath,
+        ),
+        voiceReplyPath: installedReplyPath(
+          portableResponse.voiceReplyPath,
+        ),
       );
 
       final installedMetadata = File(
